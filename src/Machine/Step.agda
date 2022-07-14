@@ -76,6 +76,20 @@ labeled-multi-trans R x y z .(α ∷ ω) ω₂ (multi-step .x y₁ .y α ω x₁
 
 {- TRANSITION STATES -}
 
+{- TODO: Add an event type which is the sum of consisting of message sends, receives, and
+         other actions (such as get, post, etc) and modify process history to accept it
+
+   TODO: Specialize the labeled transition relation to a transition on the process state
+         called `LState` below. Try to keep transitions sufficiently general to allow
+         reuse in different protocols
+
+   TODO: Add a "local causal ordering" safety predicate on the LState below, test on some examples
+         Note: This can maybe be written as a decision procedure
+
+   TODO: Cook up a trivial protocol which has causal safety in terms of a transition system to test
+         if specification makes sense
+-} 
+
 -- The generalized local state of a process
 record LState (A S : Set) : Set₁ where
   constructor ⟨_,_⟩
