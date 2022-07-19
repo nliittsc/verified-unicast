@@ -2,6 +2,7 @@ module Machine.Step where
 
 open import Data.List
 open import Data.List.Properties
+open import Data.List.Membership.Propositional
 open import Data.Nat using (ℕ)
 open import Data.Product
 open import Level
@@ -9,6 +10,8 @@ open import Machine.Core
 open import Relation.Binary.PropositionalEquality renaming ([_] to ⟨_⟩)
 open ≡-Reasoning
 
+
+open Msg public
 
 private
   variable
@@ -53,7 +56,7 @@ multi-trans R x y₁ z (multi-step .x y .y₁ Rxy R⋆yy₁) R⋆yz = multi-step
 
 {- Define the abstract multi-step (labeled) transition relation.
    Sequences of actions are contained in lists -}
-data labeled-multi {X : Set a} {A : Set b} (R : LabeledRel X A (suc (a ⊔ b))) : LabeledRel X (List A) (suc (a ⊔ b)) where
+data labeled-multi {X : Set a} {A : Set b} (R : LabeledRel X A ℓ) : LabeledRel X (List A) (a ⊔ b ⊔ ℓ) where
   multi-refl : ∀(x : X) → labeled-multi R x [] x
   multi-step : ∀(x y z : X) (α : A) (ω : List A) → R x α y → labeled-multi R y ω z →
                labeled-multi R x (α ∷ ω) z
@@ -81,6 +84,14 @@ labeled-multi-trans R x y z .(α ∷ ω) ω₂ (multi-step .x y₁ .y α ω x₁
             in  multi-step x y₁ z α (ω ++ ω₂) x₁ ind-step
 
 
+---------- Trace Theory ----------
+
+-- Predicate that describes whether a sequence ω is a trace of the (refl-tran closure of the) relation R
+traces : ∀{X : Set a} {A : Set b} → (R : LabeledRel X A ℓ) → (List A) → X → Set (a ⊔ b ⊔ ℓ)
+traces R ω s = ∃ λ s' → labeled-multi R s ω s'
+
+
+
 {- TRANSITION STATES -}
 
 {- TODO: Add an event type which is the sum of consisting of message sends, receives, and
@@ -103,8 +114,8 @@ labeled-multi-trans R x y z .(α ∷ ω) ω₂ (multi-step .x y₁ .y α ω x₁
 --       This would allow a sort of general specification protocol, but not sure
 --       how pragmatic it would be
 data Event (A E : Set) : Set where
-  send⟨_,_⟩ : Msg A → Event A E
-  recv⟨_,_⟩ : Msg A → Event A E
+  send⟨_⟩ : Msg A → Event A E
+  recv⟨_⟩ : Msg A → Event A E
   evt⟨_⟩    : E → Event A E
 
 
@@ -116,6 +127,12 @@ record LState (A E S : Set) : Set where
     history : List (Event A E)
     state   : S
 
+
+{- Defining Mattern's notion of _~_ to mean "happens on same process".
+   Only applies to sends and receives. -}
+data same-proc {A E : Set} : Event A E → Event A E → Set where
+  two-sends : ∀{m m' : Msg A} → sender m ≡ sender m' → same-proc send⟨ m ⟩ send⟨ m' ⟩
+  two-recvs : ∀{m m' : Msg A} → receiver m ≡ receiver m' → same-proc recv⟨ m ⟩ recv⟨ m' ⟩
 
 {- Building the machinery for (local) causal ordering?
    Without causal dependency tracking, no way to know if the local state obeys causal
@@ -163,6 +180,7 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
   _-⟨_⟩→_ = _-[_]→_ {A} {E} {S} {_=⟨_⟩⇒_}
 
   Process = LState A E S
+  
 
   -- parameterized by number of states, message type, event type, state type
   -- System : ℕ → Set → Set → Set → Set₁
@@ -170,12 +188,10 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
 
   Action = Event A E
   
-  -- LTS : ℕ → Set → Set → Set → Set₂
-  -- LTS = System → Action → System → Set
-  LTS = LabeledRel System Action 0ℓ
+  SystemLTS = LabeledRel System Action (suc 0ℓ)
 
   -- Defines the system-wide transition system in terms of the local ones
-  data _-[_]⇝_ : System → Action → System → Set₁ where
+  data _-[_]⇝_ : SystemLTS where
 
     {- If the process p at position i takes a step to p', the system
        takes a step to replace p with p' -}
@@ -186,3 +202,23 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
 
   -- The reflexive-transitive closure
   _-[_]⇝⋆_ = labeled-multi _-[_]⇝_
+
+  postulate
+    -- TODO : Define this happens-before properly on the (linearization of?) events
+    _≺hb_ : Event A E → Event A E → Set
+
+    -- TODO: make this a module parameter somehow
+    Init : System → Set
+
+  system-trace = traces _-[_]⇝_
+
+  -- Mattern's "happens on the same process". Only valid for two sends/two recvs
+  _~_ = same-proc {A} {E}
+
+  -- A predicate for causal-ordering.
+  data CausallyOrdered (Π₀ : System) : Set₂ where
+    co : ∀(ω : List (Event A E)) (m m' : Msg A) → Init Π₀ → system-trace ω Π₀ →
+                     send⟨ m ⟩ ∈ ω → send⟨ m' ⟩ ∈ ω  → recv⟨ m ⟩ ∈ ω → recv⟨ m' ⟩ ∈ ω →
+                     send⟨ m ⟩ ~ send⟨ m' ⟩ → recv⟨ m ⟩ ~ recv⟨ m' ⟩ →
+                     send⟨ m ⟩ ≺hb send⟨ m' ⟩ → recv⟨ m ⟩ ≺hb recv⟨ m' ⟩ →
+                     CausallyOrdered Π₀
