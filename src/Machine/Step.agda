@@ -2,44 +2,50 @@ module Machine.Step where
 
 open import Data.List
 open import Data.List.Properties
-open import Data.Nat
+open import Data.Nat using (ℕ)
 open import Data.Product
+open import Level
 open import Machine.Core
 open import Relation.Binary.PropositionalEquality renaming ([_] to ⟨_⟩)
 open ≡-Reasoning
+
+
+private
+  variable
+    a b c ℓ : Level
 
 {- Setting up some neccesary abstractions here -}
 
 -- FIXME : Universe levels are messed up. Need to be polymorphic over
 -- levels so that system-wide abstractions can be defined
 
-BinRel : Set → Set → Set₁
-BinRel A B = A → B → Set
+BinRel : Set a → Set b → (ℓ : Level) → Set (a ⊔ b ⊔ suc ℓ)
+BinRel A B ℓ = A → B → Set ℓ
 
-Relation : Set → Set₁
-Relation A = BinRel A A
+Relation : Set a → (ℓ : Level) → Set (a ⊔ suc ℓ)
+Relation A ℓ = BinRel A A ℓ
 
-TriRel : Set → Set → Set → Set₁
-TriRel A B C = A → B → C → Set
+TriRel : Set a → Set b → Set c → (ℓ : Level) → Set (a ⊔ b ⊔ c ⊔ suc ℓ)
+TriRel A B C ℓ = A → B → C → Set ℓ
 
-LabeledRel : Set → Set → Set₁
-LabeledRel A B = TriRel A B A
+LabeledRel : Set a → Set b → (ℓ : Level) → Set (a ⊔ b ⊔ suc ℓ)
+LabeledRel A B ℓ = TriRel A B A ℓ
 
 
 ---------- Unlabled Transition Relation ----------
 
 
 -- Define the abstract multi-step (unlabled) transition relation
-data multi {X : Set} (R : Relation X) : Relation X where
+data multi {X : Set a} (R : Relation X (suc a)) : Relation X (suc a) where
   multi-refl : ∀ (x : X) → multi R x x
   multi-step : ∀ (x y z : X) → R x y → multi R y z → multi R x z
 
 -- We can replace a single step with a "multi"-step
-one-step-thm : ∀{X : Set} (R : Relation X) (x y : X) → R x y → (multi R) x y
+one-step-thm : ∀{X : Set a} (R : Relation X (suc a)) (x y : X) → R x y → (multi R) x y
 one-step-thm R x y Rxy = multi-step x y y Rxy (multi-refl y)
 
 -- the mult-step relation is transitive
-multi-trans : ∀{X : Set} (R : Relation X) (x y z : X) → multi R x y → multi R y z → multi R x z
+multi-trans : ∀{X : Set a} (R : Relation X (suc a)) (x y z : X) → multi R x y → multi R y z → multi R x z
 multi-trans R x .x z (multi-refl .x) R⋆yz = R⋆yz
 multi-trans R x y₁ z (multi-step .x y .y₁ Rxy R⋆yy₁) R⋆yz = multi-step x y z Rxy (multi-trans R y y₁ z R⋆yy₁ R⋆yz)
 
@@ -50,25 +56,25 @@ multi-trans R x y₁ z (multi-step .x y .y₁ Rxy R⋆yy₁) R⋆yz = multi-step
 
 {- Define the abstract multi-step (labeled) transition relation.
    Sequences of actions are contained in lists -}
-data labeled-multi {X A : Set} (R : LabeledRel X A) : LabeledRel X (List A) where
+data labeled-multi {X : Set a} {A : Set b} (R : LabeledRel X A (suc (a ⊔ b))) : LabeledRel X (List A) (suc (a ⊔ b)) where
   multi-refl : ∀(x : X) → labeled-multi R x [] x
   multi-step : ∀(x y z : X) (α : A) (ω : List A) → R x α y → labeled-multi R y ω z →
                labeled-multi R x (α ∷ ω) z
 
 -- Analagous to `one-step-thm` but with sequences
-labeled-one-step-thm : ∀{X A : Set} (R : LabeledRel X A) (x y : X) (α : A) →
+labeled-one-step-thm : ∀{X : Set a} {A : Set b} (R : LabeledRel X A (suc (a ⊔ b))) (x y : X) (α : A) →
                        R x α y → labeled-multi R x [ α ] y
 labeled-one-step-thm R x y α Rxαy = multi-step x y y α [] Rxαy (multi-refl y)
 
 
 -- Not sure if needed...
-labeled-multi-refl-lemma : ∀{X A : Set} (R : LabeledRel X A) (x y : X) (ω : List A) →
+labeled-multi-refl-lemma : ∀{X : Set a} {A : Set b} (R : LabeledRel X A (suc (a ⊔ b))) (x y : X) (ω : List A) →
                           labeled-multi R x ω y → labeled-multi R x (ω ++ []) y
 labeled-multi-refl-lemma R x y ω R⋆xωy = subst (λ l → labeled-multi R x l y) (sym (++-identityʳ ω)) R⋆xωy
 
 
 -- Analagous to `multi-trans`, but with labeled sequences
-labeled-multi-trans : ∀{X A : Set} (R : LabeledRel X A) (x y z : X) (ω₁ ω₂ : List A) →
+labeled-multi-trans : ∀{X : Set a} {A : Set b} (R : LabeledRel X A (suc (a ⊔ b))) (x y z : X) (ω₁ ω₂ : List A) →
                       labeled-multi R x ω₁ y → labeled-multi R y ω₂ z → labeled-multi R x (ω₁ ++ ω₂) z
 labeled-multi-trans R x .x z .[] ω₂ (multi-refl .x) R⋆yω₂z = R⋆yω₂z
 labeled-multi-trans R x y z .(α ∷ ω) ω₂ (multi-step .x y₁ .y α ω x₁ R⋆xω₁y) R⋆yω₂z = proof
@@ -106,7 +112,7 @@ data Event (A E : Set) : Set where
 
 
 -- The generalized local state of a process
-record LState (A E S : Set) : Set₁ where
+record LState (A E S : Set) : Set where
   constructor ⟨_﹐_﹐_⟩
   field
     pid     : Pid
@@ -134,7 +140,7 @@ record LState (A E S : Set) : Set₁ where
 
 -- Just a shorthand for the transition relation type
 TSystem : Set → Set → Set → Set₂
-TSystem A E S = LState A E S → Event A E → LState A E S → Set₁
+TSystem A E S = LabeledRel (LState A E S) (Event A E) (suc 0ℓ)
 
 infix 10 _-[_]→_
 
@@ -151,7 +157,7 @@ data _-[_]→_ {A E S : Set}
 -- Possible lemma: ls -[ α ]→ ls' ⇔ history ls ⊂ history ls'
 
 open import Data.Vec as V
-open import Data.Fin as F
+open import Data.Fin as F hiding (suc)
 
 -- Assuming some transition system
 module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S → Set) where
@@ -168,17 +174,18 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
   Action = Event A E
   
   -- LTS : ℕ → Set → Set → Set → Set₂
-  LTS = System → Action → System → Set
+  -- LTS = System → Action → System → Set
+  LTS = LabeledRel System Action 0ℓ
 
   -- Defines the system-wide transition system in terms of the local ones
-  data _-[_]⟿_ : System → Action → System → Set where
+  data _-[_]⇝_ : System → Action → System → Set₁ where
 
     {- If the process p at position i takes a step to p', the system
        takes a step to replace p with p' -}
     step : ∀{α : Action} {p p' : Process} {Π : System} {i : F.Fin n} →
            Π [ i ]= p → 
            p -⟨ α ⟩→ p' →
-           Π -[ α ]⟿ (Π [ i ]≔ p')
+           Π -[ α ]⇝ (Π [ i ]≔ p')
 
   -- The reflexive-transitive closure
-  _-[_]⟿⋆_ = labeled-multi {! _-[_]⟿_!}
+  _-[_]⇝⋆_ = labeled-multi _-[_]⇝_
