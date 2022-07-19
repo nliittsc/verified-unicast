@@ -16,9 +16,6 @@ private
 
 {- Setting up some neccesary abstractions here -}
 
--- FIXME : Universe levels are messed up. Need to be polymorphic over
--- levels so that system-wide abstractions can be defined
-
 BinRel : Set a → Set b → (ℓ : Level) → Set (a ⊔ b ⊔ suc ℓ)
 BinRel A B ℓ = A → B → Set ℓ
 
