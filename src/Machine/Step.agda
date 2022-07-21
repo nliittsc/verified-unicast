@@ -170,7 +170,7 @@ data _-[_]→_ {A E S : Set}
 
 -- Possible lemma: ls -[ α ]→ ls' ⇔ history ls ⊂ history ls'
 
-open import Data.Vec as V
+open import Data.Vec as V hiding (_++_)
 open import Data.Fin as F hiding (suc)
 
 -- Assuming some transition system
@@ -208,17 +208,54 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
     _≺hb_ : Event A E → Event A E → Set
 
     -- TODO: make this a module parameter somehow
-    Init : System → Set
+    start-state : System → Set
 
   system-trace = traces _-[_]⇝_
+
+  -- An execution is a system paired with a sequence of past actions
+  Execution = System × List Action
+
+
+  {- Important note: A "system trace" is a predicate which tells us if
+     a sequence of actions will _lead to_ a valid system state from an
+     _initial_ state. It is a subset of all lists of actions.
+
+     A "well-formed" execution is a predicate that tells us if actions
+     and a system are mutually compatible. They should be subtly different
+  -}
+
+  -- wf-exe : Execution → Set₁
+  -- wf-exe (Π , ω) = {!!}
+
+  {- Defining an operational version of "happens-before".
+     Essentially happens-before but on a linearization.
+     Should actually be decidable if comparing message
+     types is decidable.
+
+     TODO: Should there be a lemma relating this to traditional
+           happens before or causal histories?
+
+     FIXME: Should possible to define this more concisely with just
+            wf-exe (Π , ω) and ω₁ ++ ω₂ ≡ ω since wf-exe "contains"
+            information on the transition system
+  -}
+
+  -- Something like an "execution order"
+  -- FIXME: Is this definition correct?
+  data _≺[_]_ : Action → List Action × System → Action → Set₁ where
+    exe-ord : ∀{e₁ e₂ ω Π₀ } ω₁ ω₂ → system-trace ω Π₀ →
+              start-state Π₀ →
+              e₁ ∈ ω₁ → e₂ ∈ ω₂ →
+              ω₁ ++ ω₂ ≡ ω →
+              e₁ ≺[ ω , Π₀ ] e₂
 
   -- Mattern's "happens on the same process". Only valid for two sends/two recvs
   _~_ = same-proc {A} {E}
 
   -- A predicate for causal-ordering.
-  data CausallyOrdered (Π₀ : System) : Set₂ where
-    co : ∀(ω : List (Event A E)) (m m' : Msg A) → Init Π₀ → system-trace ω Π₀ →
-                     send⟨ m ⟩ ∈ ω → send⟨ m' ⟩ ∈ ω  → recv⟨ m ⟩ ∈ ω → recv⟨ m' ⟩ ∈ ω →
-                     send⟨ m ⟩ ~ send⟨ m' ⟩ → recv⟨ m ⟩ ~ recv⟨ m' ⟩ →
-                     send⟨ m ⟩ ≺hb send⟨ m' ⟩ → recv⟨ m ⟩ ≺hb recv⟨ m' ⟩ →
-                     CausallyOrdered Π₀
+  data CausallySafe (Π₀ : System) : Set₂ where
+    co : ∀(ω : List (Event A E)) (m m' : Msg A) → system-trace ω Π₀ →
+         send⟨ m ⟩ ∈ ω → send⟨ m' ⟩ ∈ ω  → recv⟨ m ⟩ ∈ ω → recv⟨ m' ⟩ ∈ ω →
+         send⟨ m ⟩ ~ send⟨ m' ⟩ → recv⟨ m ⟩ ~ recv⟨ m' ⟩ →
+         send⟨ m ⟩ ≺[ ω , Π₀ ] send⟨ m' ⟩ → recv⟨ m ⟩ ≺[ ω , Π₀ ] recv⟨ m' ⟩ →
+         CausallySafe Π₀
