@@ -119,13 +119,16 @@ data Event (A E : Set) : Set where
   evt⟨_⟩    : E → Event A E
 
 
--- The generalized local state of a process
+{- The generalized local state of a process. Has a process ID, a log containing
+   a list of events that have happened, and an application-dependent piece of
+   state (e.g., a delay queue, or input-output buffers)
+-}
 record LState (A E S : Set) : Set where
   constructor ⟨_﹐_﹐_⟩
   field
-    pid     : Pid
-    history : List (Event A E)
-    state   : S
+    pid   : Pid
+    log   : List (Event A E)
+    state : S
 
 
 {- Defining Mattern's notion of _~_ to mean "happens on same process".
