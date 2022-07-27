@@ -119,16 +119,13 @@ data Event (A E : Set) : Set where
   evt⟨_⟩    : E → Event A E
 
 
-{- The generalized local state of a process. Has a process ID, a log containing
-   a list of events that have happened, and an application-dependent piece of
-   state (e.g., a delay queue, or input-output buffers)
--}
+-- The generalized local state of a process
 record LState (A E S : Set) : Set where
   constructor ⟨_﹐_﹐_⟩
   field
-    pid   : Pid
-    log   : List (Event A E)
-    state : S
+    pid     : Pid
+    history : List (Event A E)
+    state   : S
 
 
 {- Defining Mattern's notion of _~_ to mean "happens on same process".
@@ -159,17 +156,16 @@ data same-proc {A E : Set} : Event A E → Event A E → Set where
 TSystem : Set → Set → Set → Set₂
 TSystem A E S = LabeledRel (LState A E S) (Event A E) (suc 0ℓ)
 
-infix 10 _-[_]→_
 
 -- A local state transition system
-data _-[_]→_ {A E S : Set}
-             {_=⟨_⟩⇒_ : S → Event A E → S → Set}
+data step-R {A E S : Set}
+             {_=[_]⇒_ : S → Event A E → S → Set}
              : TSystem A E S where
 
   -- If an event changes a local piece of state, change
   -- the state and update the history to include that event
-  lstep : ∀{i h s s' α} → s =⟨ α ⟩⇒ s' →
-          ⟨ i ﹐ h ﹐ s ⟩ -[ α ]→ ⟨ i ﹐ (α ∷ h) ﹐ s' ⟩
+  lstep : ∀{i h s s' α} → s =[ α ]⇒ s' →
+          step-R ⟨ i ﹐ h ﹐ s ⟩ α ⟨ i ﹐ (α ∷ h) ﹐ s' ⟩
 
 -- Possible lemma: ls -[ α ]→ ls' ⇔ history ls ⊂ history ls'
 
@@ -177,10 +173,10 @@ open import Data.Vec as V hiding (_++_)
 open import Data.Fin as F hiding (suc)
 
 -- Assuming some transition system
-module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S → Set) where
+module SystemStep (n : ℕ) (A E S : Set) (_=[_]⇒_ : S → Event A E → S → Set) where
 
   _-⟨_⟩→_ : TSystem A E S
-  _-⟨_⟩→_ = _-[_]→_ {A} {E} {S} {_=⟨_⟩⇒_}
+  _-⟨_⟩→_ = step-R {A} {E} {S} {_=[_]⇒_}
 
   Process = LState A E S
   
@@ -193,15 +189,22 @@ module SystemStep (n : ℕ) (A E S : Set) (_=⟨_⟩⇒_ : S → Event A E → S
   
   SystemLTS = LabeledRel System Action (suc 0ℓ)
 
+  -- FIXME: How to indicate user-specified, fixed, complementary actions?
+  data _⋈_ (α β : Action) : Set where
+    compl : α ⋈ β
+
   -- Defines the system-wide transition system in terms of the local ones
+  {- FIXME : Probably need a notion of "complementary" actions that capture
+     the semantics of system communication. e.g., post m/get m are
+     complementary -}
   data _-[_]⇝_ : SystemLTS where
 
     {- If the process p at position i takes a step to p', the system
        takes a step to replace p with p' -}
-    step : ∀{α : Action} {p p' : Process} {Π : System} {i : F.Fin n} →
-           Π [ i ]= p → 
-           p -⟨ α ⟩→ p' →
-           Π -[ α ]⇝ (Π [ i ]≔ p')
+    internal : ∀{α : Action} {p p' : Process} {Π : System} {i : F.Fin n} →
+               Π [ i ]= p → 
+               p -⟨ α ⟩→ p' →
+               Π -[ α ]⇝ (Π [ i ]≔ p')
 
   -- The reflexive-transitive closure
   _-[_]⇝⋆_ = labeled-multi _-[_]⇝_
