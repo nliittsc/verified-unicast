@@ -113,10 +113,15 @@ traces R ω s = ∃ λ s' → labeled-multi R s ω s'
 -- TODO: Should events contain their causal histories for dependency tracking?
 --       This would allow a sort of general specification protocol, but not sure
 --       how pragmatic it would be
+
+
+-- Can you devise a IO monad to handle sends and receives?
+-- Devise a type that happens to be a monad but also can leave a "monadic trace"
+-- which captures all the events that have occurred 
 data Event (A E : Set) : Set where
   send⟨_⟩ : Msg A → Event A E
   recv⟨_⟩ : Msg A → Event A E
-  evt⟨_⟩    : E → Event A E
+  evt⟨_⟩  : E → Event A E
 
 
 -- The generalized local state of a process
@@ -173,6 +178,7 @@ open import Data.Vec as V hiding (_++_)
 open import Data.Fin as F hiding (suc)
 
 -- Assuming some transition system
+-- *** Read Jonathan's posts ***
 module SystemStep (n : ℕ) (A E S : Set) (_=[_]⇒_ : S → Event A E → S → Set) where
 
   _-⟨_⟩→_ : TSystem A E S
@@ -217,6 +223,14 @@ module SystemStep (n : ℕ) (A E S : Set) (_=[_]⇒_ : S → Event A E → S →
     start-state : System → Set
 
   system-trace = traces _-[_]⇝_
+
+
+  -- Π₀ -[ S ]⇝* Π
+  -- S ≡ send⟨ m ⟩ @ i ∷ recv⟨ m ⟩ @ j ∷ []
+
+  -- S ≡ recv⟨ m ⟩ ∷ []  -- not allowed
+
+  -- ∀ (S : List Action) (Π₀ Π : System) → Initial Πₒ → Π₀ -[ S ]⇝* Π → WellFormed S → Causally-Ordered S
 
   -- An execution is a system paired with a sequence of past actions
   Execution = System × List Action

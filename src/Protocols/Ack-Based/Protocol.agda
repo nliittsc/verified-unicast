@@ -18,6 +18,9 @@ open import Relation.Nullary
 open import Machine.Core
 open import Machine.Step
 
+
+
+
 enqueue : ∀{A : Set} → A → List A → List A
 enqueue a xs = xs ++ [ a ]
 
@@ -71,6 +74,15 @@ module Impl (RawMsg : Set)
       ibuf   : InBuf
 
   open AppState public
+
+
+{-
+  loop = do
+    m <- receive
+    let s' = δ s recv⟨ m ⟩
+        msgs = step s'
+        
+-}
 
   
 
@@ -143,10 +155,11 @@ module Impl (RawMsg : Set)
   
   -- Next case is a "straightfoward" proof by using substitution 3 times
   -- FIXME? : Holy shit this proof is terrible. Why is it so awful? I feel like a villain writing this
+  -- Could possibly use with blocks to get injectivity properties
   app-step-correctˡ (st (ob sₒ qₒ) ibuf₁) (st (ob sₒ' (m' ∷ qₒ')) ibuf₂) send⟨ m ⟩ δₐse≡s' = prf
     where
       sₒ≡sₒ' : sₒ ≡ sₒ'
-      sₒ≡sₒ' = ob-s-injective (st-obuf-injective (just-injective δₐse≡s'))
+      sₒ≡sₒ' = ob-s-injective (st-obuf-injective (just-injective  δₐse≡s'))
       qₒ≡qₒ' : enqueue m qₒ ≡ m' ∷ qₒ'
       qₒ≡qₒ' = ob-q-injective (st-obuf-injective (just-injective δₐse≡s'))
       ibuf₁≡ibuf₂ : ibuf₁ ≡ ibuf₂
@@ -208,6 +221,9 @@ module Impl (RawMsg : Set)
   app-step-correctʳ .(st _ (ib _ _)) .(st _ (ib _ (enqueue _ _))) .(evt⟨ get⟨ _ ⟩ ⟩) get-rule = {!!}
   app-step-correctʳ .(st _ (ib ok✓ (_ ∷ _))) .(st _ (ib ok✓ _)) .(evt⟨ recv-req ⟩) req-rule = {!!}
 
+
+
+  --- 
   app-step-correct : ∀ s s' e → (δₐ s e ≡ just s' → s =[ e ]⇒ s') × (s =[ e ]⇒ s' → δₐ s e ≡ just s')
   app-step-correct s s' e = app-step-correctˡ s s' e , app-step-correctʳ s s' e
   
