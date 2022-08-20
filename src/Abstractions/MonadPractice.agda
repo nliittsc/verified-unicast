@@ -89,7 +89,7 @@ receive : Trace String
 receive = await {!!}
 
 ‵send : String → Trace ⊤
-‵send str = step (send str) {!await tt!}
+‵send str = step (send str) (await tt)
 
 
 module _ where
@@ -117,4 +117,22 @@ main s = do
   let s' = update m s
       m' = getWork s'
   ‵send m'
+
+
+
+-- P ⟶ P'     Q ⟶ Q'
+-- ---------------------
+--  P || Q ⟶ P' || Q'
+
+-- step s a ≡ s' ⇔ s =[ a ]⇒ s'
+
+
+-- Π[ i ] = s
+-- s =[ a ]⇒ s'
+-- -------------
+-- Π -[ a ]→ Π[ i ]≔ s'
+
+
+
+
 
