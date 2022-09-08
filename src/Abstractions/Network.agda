@@ -152,34 +152,65 @@ _≺[_]_ : ∀{A : Set} → A → List A → A → Set
 a ≺[ αs ] b = ∃₂ λ xs ys → (αs ≡ xs ++ ys × a ∈ xs × b ∈ ys)
 
 -- An initial configuration
-Init : Config → Set
-Init c = ∀ i j → proj₂ (c i) j ≡ buf []
+Init : Fin num-site → Fin num-site → Config → Set
+Init i j c = proj₂ (c i) j ≡ buf []
 
-deq-lemma : ∀ i j c → Init c → proj₂ (deq-buffer j (proj₂ (c i))) ≡ nothing
-deq-lemma i j c init-c  with proj₂ (c i) j | init-c i j
-... | .(buf []) | refl = refl
+deq-lemma : ∀ i j c → Init i j c → proj₂ (deq-buffer j (proj₂ (c i))) ≡ nothing
+deq-lemma i j c init-c with proj₂ (c i) j | init-c
+... | buf .[] | refl = refl
 
 ¬just-x≡nothing : ∀{A : Set} {x : A} → ¬ just x ≡ nothing
 ¬just-x≡nothing ()
 
+α₁≺[L]α₂⇒α₁[α::L]α₂ : ∀{A : Set} {α₁ α₂ L} (α′ : A) → α₁ ≺[ L ] α₂ → α₁ ≺[ α′ ∷ L ] α₂
+α₁≺[L]α₂⇒α₁[α::L]α₂ α′ (xs , ys , L≡xs++ys , α₁∈xs , α₂∈ys) = α′ ∷ xs , (ys , cong (_∷_ α′) L≡xs++ys , (there α₁∈xs , α₂∈ys))
+
 -- TODO: Finish proving this correctness condition for the model
 send≺deliv : ∀ i j m c c′ A →
-             Init c →
+             Init i j c →
              c ⟿⋆⟨ A ⟩ c′ →
              send [ (j , m) ] i ∈ A →
              deliv m i j ∈ A →
              send [ (j , m) ] i ≺[ A ] deliv m i j
+
+-- deliv and send cant both be the first operation
 send≺deliv i j m c c′ .(send [ (j , m) ] i ∷ _)  init-c c⟿⋆c′ (here refl) (here ())
+
+-- the first operation is send, so the proof is trivial
 send≺deliv i j m c c′ .(send [ (j , m) ] i ∷ xs) init-c c⟿⋆c′ p@(here {xs = xs} refl) (there deliv∈A) = prf
   where
     prf = [ send [ (j , m) ] i ] , (xs , refl , (here refl , deliv∈A))
+
+-- A deliver happens before a send, which is impossible
 send≺deliv i j m c c′ _ init-c (iter _ _ _ _ _ (deliv-step _ _ _ _ _ _ (deliv-step _ _ _ _ x) x₁) _) (there send∈A) (here refl) = prf
   where
     prf = ⊥-elim (¬just-x≡nothing (trans x (deq-lemma i j c init-c)))
-send≺deliv i j m c c′ .(τ x₁ ∷ A) init-c (iter .c (τ x₁) A .c′ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
-send≺deliv i j m c c′ .(deliv x₁ x₂ x₃ ∷ A) init-c (iter .c (deliv x₁ x₂ x₃) A .c′ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
-send≺deliv i j m c c′ .(send x₁ x₂ ∷ A) init-c (iter .c (send x₁ x₂) A .c′ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
- -- where
- --    prf : send [ (j , m) ] i ≺[ α ∷ A ] deliv m i j
- --    prf = {!!}
 
+-- Internal computation steps do not affect buffers, so its still an "initial" configuration
+send≺deliv i j m c c′ (τ k ∷ A) init-c (iter .c .(τ k) A .c′ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
+
+-- Delivering somewhere else should allow us to proceed by induction. `Deliv i j m` can't happen by hypothesis.
+send≺deliv i j m c c′ (deliv m′ i′ j′ ∷ A) init-c (iter _ _ A _ _ (deliv-step _ _ _ cᵢ cⱼ _ (deliv-step _ _ _ _ x) x₁) c₁⟿⋆c′) (there send∈A) (there deliv∈A) with i ≟ i′ | j ≟ j′
+... | yes refl | yes refl = ⊥-elim (¬just-x≡nothing (trans x (deq-lemma i j c init-c)))
+... | no ¬i≡i′ | yes refl = {!!}
+... | yes refl | no ¬j≡j′ = {!!}
+... | no ¬i≡i′ | no ¬j≡j′ = α₁≺[L]α₂⇒α₁[α::L]α₂ _ prf
+  where
+    p : Init i j ( c [ i ← cᵢ ] [ j ← cⱼ ])
+    p = {!!}
+    prf = (send≺deliv i j m {!!} {!!} {!!} {!!} c₁⟿⋆c′ send∈A deliv∈A)
+
+-- If the message sent is the same as `send [ j , m ] i`, then we are done. Otherwise they are not the same,
+-- so we should be able to proceed by induction....
+send≺deliv i j m c c′ (send l i′ ∷ A) init-c (iter _ _ A _ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
+
+
+causal-deliv : ∀ i j k m₁ m₂ c c′ A →
+               Init i j c →
+               c ⟿⋆⟨ A ⟩ c′ →
+               send [ (j , m₁) ] i ∈ A →
+               send [ (j , m₂) ] k ∈ A →
+               send [ (j , m₁) ] i ≺[ A ] send [ (j , m₂) ] k →
+               deliv m₁ i j ∈ A → deliv m₂ k j ∈ A →
+               deliv m₁ i j ≺[ A ] deliv m₂ k j
+causal-deliv = {!!}
