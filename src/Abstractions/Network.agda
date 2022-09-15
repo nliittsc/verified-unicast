@@ -205,12 +205,11 @@ send≺deliv i j m c c′ (deliv m′ i′ j′ ∷ A) init-c (iter _ _ A _ _ (d
 send≺deliv i j m c c′ (send l i′ ∷ A) init-c (iter _ _ A _ c₁ x c₁⟿⋆c′) (there send∈A) (there deliv∈A) = {!!}
 
 
-causal-deliv : ∀ i j k m₁ m₂ c c′ A →
-               Init i j c →
+CausallyOrdered = ∀ i j k m₁ m₂ c c′ A →
+               (∀ i j → Init i j c) →
                c ⟿⋆⟨ A ⟩ c′ →
                send [ (j , m₁) ] i ∈ A →
                send [ (j , m₂) ] k ∈ A →
                send [ (j , m₁) ] i ≺[ A ] send [ (j , m₂) ] k →
                deliv m₁ i j ∈ A → deliv m₂ k j ∈ A →
                deliv m₁ i j ≺[ A ] deliv m₂ k j
-causal-deliv = {!!}
